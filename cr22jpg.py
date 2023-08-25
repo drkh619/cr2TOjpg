@@ -1,20 +1,30 @@
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import ttk
-from PIL import Image
+from tkinter import messagebox
+from PIL import Image, JpegImagePlugin
 import os
 import threading
 
-def convert_files(input_dir, output_dir):
+def convert_files(input_dir, output_dir, replace_existing):
     files_to_convert = [filename for filename in os.listdir(input_dir) if filename.lower().endswith(".cr2")]
     total_files = len(files_to_convert)
     
     for index, filename in enumerate(files_to_convert):
         cr2_file = os.path.join(input_dir, filename)
         jpg_file = os.path.join(output_dir, os.path.splitext(filename)[0] + ".jpg")
+        
+        # Check if the file already exists and the user wants to replace it
+        if not replace_existing and os.path.exists(jpg_file):
+            status_label.config(text=f"Skipped: {filename} (File already exists)")
+            continue
+        
         try:
             with Image.open(cr2_file) as im:
-                im.save(jpg_file, "JPEG")
+                # Ensure maximum JPEG quality
+                if im.mode != 'RGB':
+                    im = im.convert('RGB')
+                im.save(jpg_file, "JPEG", quality=100)
             status_label.config(text=f"Converted: {filename}")
         except Exception as e:
             status_label.config(text=f"Error converting {filename}: {str(e)}")
@@ -37,12 +47,14 @@ def select_output_dir():
 def convert():
     input_dir = input_dir_entry.get()
     output_dir = output_dir_entry.get()
+    replace_existing = replace_var.get()  # Check if the "Replace Existing" checkbox is selected
+    
     if not input_dir or not output_dir:
         status_label.config(text="Please select input and output directories.")
         return
     
     # Create a separate thread for conversion to avoid freezing the GUI
-    conversion_thread = threading.Thread(target=convert_files, args=(input_dir, output_dir))
+    conversion_thread = threading.Thread(target=convert_files, args=(input_dir, output_dir, replace_existing))
     conversion_thread.start()
 
 app = tk.Tk()
@@ -69,14 +81,18 @@ output_dir_entry.grid(row=1, column=1, padx=5, pady=5)
 output_dir_button = tk.Button(frame, text="Select", command=select_output_dir)
 output_dir_button.grid(row=1, column=2, padx=5, pady=5)
 
+replace_var = tk.BooleanVar()
+replace_checkbox = tk.Checkbutton(frame, text="Replace Existing Files", variable=replace_var)
+replace_checkbox.grid(row=2, column=0, columnspan=3, padx=5, pady=5)
+
 convert_button = tk.Button(frame, text="Convert", command=convert)
-convert_button.grid(row=2, column=0, columnspan=3, padx=5, pady=10)
+convert_button.grid(row=3, column=0, columnspan=3, padx=5, pady=10)
 
 progress_var = tk.DoubleVar()
 progress_bar = ttk.Progressbar(frame, variable=progress_var, maximum=100)
-progress_bar.grid(row=3, column=0, columnspan=3, padx=5, pady=5, sticky="we")
+progress_bar.grid(row=4, column=0, columnspan=3, padx=5, pady=5, sticky="we")
 
 status_label = tk.Label(frame, text="")
-status_label.grid(row=4, column=0, columnspan=3, padx=5, pady=5)
+status_label.grid(row=5, column=0, columnspan=3, padx=5, pady=5)
 
 app.mainloop()
